@@ -22,7 +22,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let follow = arguments.get::<bool>("follow").unwrap_or(false);
     let threads = arguments.get::<usize>("workers").unwrap_or(10);
-    let ignore = arguments.get::<usize>("ignore").unwrap_or(0);
+    let ignore_cmd = arguments
+        .get::<String>("ignore")
+        .unwrap_or(String::from("0"));
+
+    let ignore: Vec<i32> = ignore_cmd
+        .split(',')
+        .filter_map(|s| s.trim().parse().ok())
+        .collect();
 
     if let Some(dict) = arguments.get::<String>("dict") {
         if let Some(host) = arguments.get::<String>("host") {
@@ -48,7 +55,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let chunk_size = 100;
                 let mut chunk = Vec::with_capacity(chunk_size);
                 while let Some(line) = lines.next_line().await? {
-                    // ignore comment lines
                     if !line.as_str().starts_with("#") && line.chars().count() > 1 {
                         chunk.push(line);
                         if chunk.len() == chunk_size {
@@ -57,7 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 Arc::clone(&client),
                                 chunk.clone(),
                                 Arc::clone(&semaphore),
-                                ignore,
+                                ignore.clone(),
                             )
                             .await;
                             chunk.clear();
@@ -70,7 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Arc::clone(&client),
                         chunk,
                         Arc::clone(&semaphore),
-                        ignore,
+                        ignore.clone(),
                     )
                     .await;
                 }
@@ -92,7 +98,7 @@ async fn request(
     client: Arc<Client>,
     host: &String,
     url: &String,
-    ignore: usize,
+    ignore: Vec<i32>,
 ) -> Result<String, reqwest::Error> {
     let response = client.get(url).send().await?;
 
@@ -102,7 +108,7 @@ async fn request(
     let content_hash = md5::compute(content.clone().into_bytes());
     let content_size = content.len();
 
-    if ignore as i32 != status_code {
+    if !ignore.contains(&status_code) {
         return Ok(format!(
             "{},{},{},{},{:x},{}",
             status_code, host, url, title, content_hash, content_size
@@ -116,7 +122,7 @@ async fn process_chunk(
     client: Arc<Client>,
     chunk: Vec<String>,
     semaphore: Arc<Semaphore>,
-    ignore: usize,
+    ignore: Vec<i32>,
 ) {
     let mut tasks = vec![];
     for line in chunk {
@@ -124,6 +130,7 @@ async fn process_chunk(
         let url = host.replace("[FUZZ]", line.as_str());
         let host = host.replace("[FUZZ]", "");
         let client = Arc::clone(&client);
+        let ignore = ignore.clone();
         let task = task::spawn(async move {
             // Check for overload
             let _permit = semaphore.acquire().await.unwrap();
