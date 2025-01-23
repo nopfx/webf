@@ -104,7 +104,13 @@ async fn request(
 
     let status_code = response.status().as_u16() as i32;
     let content = response.text().await?;
-    let title = get_title(content.clone()).unwrap_or("NO TITLE".to_string());
+    let title = get_title(content.clone())
+        .unwrap_or("NO TITLE".to_string())
+        .trim()
+        .replace("\t", "")
+        .replace("\r", "")
+        .replace("\n", "");
+
     let content_hash = md5::compute(content.clone().into_bytes());
     let content_size = content.len();
 
