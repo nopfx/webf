@@ -5,8 +5,17 @@ import sys
 app = Dash(__name__)
 
 df = pd.read_csv(sys.argv[1])
-data = [{"data": {"source": f'{row["hash"]}({row["bytes"]})', "target": f'{row["url"]}({row["code"]})'}} for _, row in df.iterrows()]
-edges_source = [{"data": {"id": f'{row["hash"]}({row["bytes"]})', "label": f'{row["hash"]}({row["bytes"]})'},"classes":"green"} for _, row in df.iterrows()]
+data = [
+    {
+        "data": {
+            "source": f'{row["hash"]}({row["bytes"]})',
+            "target": f'{row["url"]}({row["code"]})'
+        }
+    }
+    for _, row in df.iterrows()
+]
+
+edges_source = [{"data": {"id": f'{row["hash"]}({row["bytes"]})', "label": f'{row["hash"]}({row["bytes"]})'},"classes":"green pages"} for _, row in df.iterrows()]
 
 edges_target = [
     {
@@ -14,7 +23,7 @@ edges_target = [
             "id": f'{row["url"]}({row["code"]})',
             "label": f'{row["url"]}({row["code"]})',
         },
-        "classes": "red" if row["code"] == 404 or row["code"] == 403 else "green",
+        "classes": "red" if row["code"] == 404 or row["code"] == 403 else "yellow" if row["code"] == 401 else "purple" if row["code"] == 500 else "green" if row["code"] == 200 else "default",
     }
     for _, row in df.iterrows()]
 
@@ -39,14 +48,31 @@ app.layout = html.Div([
                 'selector':'.green',
                 'style':{
                     'background-color':'green',
-                    'line-color':'green'
                 }
             },
             {
                 'selector':'.red',
                 'style':{
                     'background-color':'red',
-                    'line-color':'red'
+                }
+            },
+            {
+                'selector':'.yellow',
+                'style':{
+                    'background-color':'yellow',
+                }
+            },
+            {
+                'selector':'.pages',
+                'style':{
+                    'shape':'rectangle',
+                    'background-color':'black',
+                }
+            },
+            {
+                'selector':'.purple',
+                'style':{
+                    'background-color':'purple',
                 }
             }
         ]
