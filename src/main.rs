@@ -1,6 +1,8 @@
 mod cli;
 
 use crate::cli::CLI;
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 use reqwest::Client;
 use std::env;
 use std::path::Path;
@@ -16,10 +18,6 @@ use tokio::{
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let arguments: CLI = CLI::new(env::args().collect());
-
-    let ua = arguments
-        .get::<String>("ua")
-        .unwrap_or("Mozilla/5.0 (Windows NT x.y; rv:10.0) Gecko/20100101 Firefox/10.0".to_string());
 
     let follow = arguments.get::<bool>("follow").unwrap_or(false);
     let threads = arguments.get::<usize>("workers").unwrap_or(10);
@@ -44,9 +42,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 let mut client_builder = Client::builder();
 
-                if !ua.is_empty() {
-                    client_builder = client_builder.user_agent(ua);
-                }
                 if follow {
                     client_builder = client_builder.redirect(reqwest::redirect::Policy::default());
                 } else {
@@ -102,13 +97,37 @@ fn get_title(html: String) -> Option<String> {
     None
 }
 
+fn get_random_user_agent() -> String {
+    let user_agents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/537.36 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:68.0) Gecko/20100101 Firefox/68.0",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36",
+        "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:88.0) Gecko/20100101 Firefox/88.0",
+        "Opera/9.80 (Macintosh; Intel Mac OS X; U; en) Presto/2.2.15 Version/10.00 Opera/9.60 (Windows NT 6.0; U; en) Presto/2.1.1",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 Edg/91.0.864.59",
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 13_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1.1 Mobile/15E148 Safari/604.1",
+    ];
+
+    let mut rng = thread_rng();
+    user_agents.choose(&mut rng).unwrap().to_string()
+}
+
 async fn request(
     client: Arc<Client>,
     host: &String,
     url: &String,
     ignore: Vec<i32>,
 ) -> Result<String, reqwest::Error> {
-    let response = client.get(url).send().await?;
+    let user_agent = get_random_user_agent();
+
+    let response = client
+        .get(url)
+        .header("User-Agent", user_agent)
+        .send()
+        .await?;
 
     let status_code = response.status().as_u16() as i32;
     let content = response.text().await?;
