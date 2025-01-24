@@ -41,38 +41,43 @@ app.layout = html.Div([
             {
                 'selector':'node',
                 'style': {
-                    'content':'data(label)'
+                    'content':'data(label)',
+                    'width':18,
+                    'height':18,
+
                 }
             },
             {
                 'selector':'.green',
                 'style':{
-                    'background-color':'green',
+                    'background-color':'#0E9AA7',
                 }
             },
             {
                 'selector':'.red',
                 'style':{
-                    'background-color':'red',
+                    'background-color':'#FE8A71',
                 }
             },
             {
                 'selector':'.yellow',
                 'style':{
-                    'background-color':'yellow',
+                    'background-color':'#F6CD61',
                 }
             },
             {
                 'selector':'.pages',
                 'style':{
                     'shape':'rectangle',
-                    'background-color':'black',
+                    'background-color':'#4a4e4d',
+                    "width":24,
+                    "height":24,
                 }
             },
             {
                 'selector':'.purple',
                 'style':{
-                    'background-color':'purple',
+                    'background-color':'#EDBEE4',
                 }
             }
         ]
