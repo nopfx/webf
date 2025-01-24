@@ -10,6 +10,7 @@ use tokio::{
     io::{AsyncBufReadExt, BufReader},
     sync::Semaphore,
     task,
+    time::{sleep, Duration},
 };
 
 #[tokio::main]
@@ -31,6 +32,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .filter_map(|s| s.trim().parse().ok())
         .collect();
 
+    let delay = arguments.get::<usize>("delay").unwrap_or(0);
+
     if let Some(dict) = arguments.get::<String>("dict") {
         if let Some(host) = arguments.get::<String>("host") {
             if Path::new(dict.as_str()).exists() {
@@ -39,7 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 let mut client_builder = Client::builder();
 
-                if ua.chars().count() > 0 {
+                if !ua.is_empty() {
                     client_builder = client_builder.user_agent(ua);
                 }
                 if follow {
@@ -48,14 +51,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     client_builder = client_builder.redirect(reqwest::redirect::Policy::none());
                 }
 
-                let semaphore = Arc::new(Semaphore::new(threads));
                 let client = Arc::new(client_builder.build()?);
+                let semaphore = Arc::new(Semaphore::new(threads)); // Shared Semaphore
                 let mut lines = reader.lines();
 
                 let chunk_size = 100;
                 let mut chunk = Vec::with_capacity(chunk_size);
                 while let Some(line) = lines.next_line().await? {
-                    if !line.as_str().starts_with("#") && line.chars().count() > 1 {
+                    if !line.starts_with("#") && !line.is_empty() {
                         chunk.push(line);
                         if chunk.len() == chunk_size {
                             process_chunk(
@@ -64,6 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 chunk.clone(),
                                 Arc::clone(&semaphore),
                                 ignore.clone(),
+                                delay,
                             )
                             .await;
                             chunk.clear();
@@ -77,6 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         chunk,
                         Arc::clone(&semaphore),
                         ignore.clone(),
+                        delay,
                     )
                     .await;
                 }
@@ -94,6 +99,7 @@ fn get_title(html: String) -> Option<String> {
     }
     None
 }
+
 async fn request(
     client: Arc<Client>,
     host: &String,
@@ -127,26 +133,32 @@ async fn process_chunk(
     host: &str,
     client: Arc<Client>,
     chunk: Vec<String>,
-    semaphore: Arc<Semaphore>,
+    semaphore: Arc<Semaphore>, // Pass semaphore here
     ignore: Vec<i32>,
+    delay: usize,
 ) {
     let mut tasks = vec![];
     for line in chunk {
-        let semaphore: Arc<Semaphore> = Arc::clone(&semaphore);
+        let semaphore = Arc::clone(&semaphore);
         let url = host.replace("[FUZZ]", line.as_str());
         let host = host.replace("[FUZZ]", "");
         let client = Arc::clone(&client);
         let ignore = ignore.clone();
+
         let task = task::spawn(async move {
-            // Check for overload
             let _permit = semaphore.acquire().await.unwrap();
+            if delay > 0 {
+                sleep(Duration::from_secs(delay as u64)).await;
+            }
+
             if !url.is_empty() {
                 if let Ok(data) = request(client, &host, &url, ignore).await {
                     if data.chars().count() > 10 {
-                        println!("{}", data)
+                        println!("{}", data);
                     }
                 }
             }
+            drop(_permit); // Explicitly release permit
         });
         tasks.push(task);
     }
