@@ -34,6 +34,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let delay = arguments.get::<usize>("delay").unwrap_or(0);
 
+    println!("code,host,url,title,hash,bytes");
+
     if let Some(dict) = arguments.get::<String>("dict") {
         if let Some(host) = arguments.get::<String>("host") {
             if Path::new(dict.as_str()).exists() {
@@ -163,7 +165,6 @@ async fn process_chunk(
         tasks.push(task);
     }
 
-    println!("code,host,url,title,hash,bytes");
     for task in tasks {
         let _ = task.await;
     }
